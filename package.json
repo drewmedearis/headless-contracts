@@ -1,0 +1,26 @@
+{
+  "name": "headless-markets-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for Headless Markets Protocol",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:coverage": "hardhat coverage",
+    "deploy:local": "hardhat deploy --network hardhat",
+    "deploy:sepolia": "hardhat deploy --network base-sepolia",
+    "deploy:mainnet": "hardhat deploy --network base-mainnet",
+    "deploy:sepolia:factory": "hardhat deploy --network base-sepolia --tags BondingCurveFactory",
+    "deploy:sepolia:governance": "hardhat deploy --network base-sepolia --tags QuorumGovernance",
+    "export": "hardhat deploy --network base-sepolia --tags export",
+    "verify": "hardhat verify",
+    "clean": "hardhat clean",
+    "node": "hardhat node"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "hardhat": "^2.19.0",
+    "hardhat-deploy": "^0.11.45",
+    "dotenv": "^16.3.1"
+  }
+}
