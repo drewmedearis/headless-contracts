@@ -101,7 +101,12 @@ contract QuorumGovernance is Ownable, ReentrancyGuard {
     mapping(uint256 => mapping(address => bool)) public hasVoted;
     mapping(uint256 => mapping(address => bool)) public isQuorumMember;
 
+    // Local storage for voting weights (HM-06) - avoids external calls
+    mapping(uint256 => mapping(address => uint256)) public agentWeight;
+    mapping(uint256 => uint256) public marketTotalWeight;
+
     uint256 public constant VOTING_PERIOD = 3 days;
+    uint256 public constant EXECUTION_WINDOW = 7 days;   // Time window to execute after voting ends (HM-05)
     uint256 public constant QUORUM_THRESHOLD_BPS = 6666; // 2/3 = 66.66%
 
     // ============ Events ============
@@ -157,6 +162,12 @@ contract QuorumGovernance is Ownable, ReentrancyGuard {
         uint256 indexed marketId
     );
 
+    event AgentWeightUpdated(
+        uint256 indexed marketId,
+        address indexed agent,
+        uint256 newWeight
+    );
+
     // ============ Constructor ============
 
     constructor(address _factory) Ownable(msg.sender) {
@@ -182,6 +193,8 @@ contract QuorumGovernance is Ownable, ReentrancyGuard {
     ) external returns (uint256 proposalId) {
         require(agents.length >= 3 && agents.length <= 10, "Quorum size 3-10");
         require(agents.length == weights.length, "Weights mismatch");
+        require(_sumWeights(weights) == 100, "Weights must sum to 100");
+        require(!_hasDuplicates(agents), "Duplicate agents");
         require(_isInArray(msg.sender, agents), "Proposer must be in quorum");
 
         proposalId = quorumProposalCount++;
@@ -246,10 +259,17 @@ contract QuorumGovernance is Ownable, ReentrancyGuard {
             proposal.thesis
         );
 
-        // Register quorum members
+        // Register quorum members and store weights locally (HM-06)
+        uint256 totalWeight = 0;
         for (uint256 i = 0; i < proposal.proposedAgents.length; i++) {
-            isQuorumMember[marketId][proposal.proposedAgents[i]] = true;
+            address agent = proposal.proposedAgents[i];
+            uint256 weight = proposal.weights[i];
+
+            isQuorumMember[marketId][agent] = true;
+            agentWeight[marketId][agent] = weight;
+            totalWeight += weight;
         }
+        marketTotalWeight[marketId] = totalWeight;
 
         emit QuorumFormed(proposalId, marketId);
     }
@@ -315,10 +335,12 @@ contract QuorumGovernance is Ownable, ReentrancyGuard {
 
     /**
      * @dev Execute a passed proposal
+     * @notice Must be executed within EXECUTION_WINDOW after voting ends
      */
     function execute(uint256 proposalId) external nonReentrant {
         Proposal storage proposal = proposals[proposalId];
         require(block.timestamp >= proposal.deadline, "Voting ongoing");
+        require(block.timestamp <= proposal.deadline + EXECUTION_WINDOW, "Execution expired");
         require(proposal.status == ProposalStatus.Active, "Proposal not active");
 
         // Check quorum (2/3 participation)
@@ -345,10 +367,24 @@ contract QuorumGovernance is Ownable, ReentrancyGuard {
 
     function _executeProposal(Proposal storage proposal) internal returns (bool) {
         if (proposal.pType == ProposalType.AddAgent) {
+            // NEW-01 FIX: Assign voting weight from proposal.value
             isQuorumMember[proposal.marketId][proposal.target] = true;
+            uint256 newWeight = proposal.value;
+            if (newWeight > 0) {
+                agentWeight[proposal.marketId][proposal.target] = newWeight;
+                marketTotalWeight[proposal.marketId] += newWeight;
+                emit AgentWeightUpdated(proposal.marketId, proposal.target, newWeight);
+            }
             return true;
         } else if (proposal.pType == ProposalType.RemoveAgent) {
+            // NEW-02 FIX: Clear weight and update total
             isQuorumMember[proposal.marketId][proposal.target] = false;
+            uint256 oldWeight = agentWeight[proposal.marketId][proposal.target];
+            if (oldWeight > 0) {
+                agentWeight[proposal.marketId][proposal.target] = 0;
+                marketTotalWeight[proposal.marketId] -= oldWeight;
+                emit AgentWeightUpdated(proposal.marketId, proposal.target, 0);
+            }
             return true;
         } else if (proposal.pType == ProposalType.TreasurySpend) {
             // Treasury spending is handled off-chain via proposal.target (recipient)
@@ -373,50 +409,49 @@ contract QuorumGovernance is Ownable, ReentrancyGuard {
         return false;
     }
 
+    /**
+     * @dev Get voting weight for an agent (uses local storage - HM-06)
+     * @param marketId The market ID
+     * @param voter The agent address
+     * @return The agent's voting weight
+     */
     function _getVotingWeight(uint256 marketId, address voter) internal view returns (uint256) {
-        (
-            ,
-            address[] memory agents,
-            uint256[] memory weights,
-            ,
-            ,
-            ,
-            ,
-            ,
-
-        ) = factory.getMarket(marketId);
-
-        for (uint256 i = 0; i < agents.length; i++) {
-            if (agents[i] == voter) {
-                return weights[i];
-            }
-        }
-        return 0;
+        return agentWeight[marketId][voter];
     }
 
+    /**
+     * @dev Get total voting weight for a market (uses local storage - HM-06)
+     * @param marketId The market ID
+     * @return The total voting weight
+     */
     function _getTotalWeight(uint256 marketId) internal view returns (uint256) {
-        (
-            ,
-            ,
-            uint256[] memory weights,
-            ,
-            ,
-            ,
-            ,
-            ,
-
-        ) = factory.getMarket(marketId);
-
-        uint256 total = 0;
-        for (uint256 i = 0; i < weights.length; i++) {
-            total += weights[i];
-        }
-        return total;
+        return marketTotalWeight[marketId];
     }
 
     function _isInArray(address addr, address[] memory arr) internal pure returns (bool) {
         for (uint256 i = 0; i < arr.length; i++) {
             if (arr[i] == addr) return true;
+        }
+        return false;
+    }
+
+    /**
+     * @dev Sum weights array (NEW-04 FIX: early validation)
+     */
+    function _sumWeights(uint256[] calldata weights) internal pure returns (uint256 sum) {
+        for (uint256 i = 0; i < weights.length; i++) {
+            sum += weights[i];
+        }
+    }
+
+    /**
+     * @dev Check for duplicate addresses (NEW-04 FIX)
+     */
+    function _hasDuplicates(address[] calldata arr) internal pure returns (bool) {
+        for (uint256 i = 0; i < arr.length; i++) {
+            for (uint256 j = i + 1; j < arr.length; j++) {
+                if (arr[i] == arr[j]) return true;
+            }
         }
         return false;
     }
@@ -480,6 +515,7 @@ contract QuorumGovernance is Ownable, ReentrancyGuard {
     // ============ Admin Functions ============
 
     function setFactory(address _factory) external onlyOwner {
+        require(_factory != address(0), "Zero address");
         factory = IBondingCurveFactory(_factory);
     }
 }

@@ -1,0 +1,111 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "timestamp": "2026-02-03T22:07:42.544Z",
+  "contracts": {
+    "factory": "0x2aA29fe97aeB0a079B241fd80BFAf64dc2273dF1",
+    "governance": "0x0EC0833743e04Ca57C0dA0EA4eCb625fb7abb92B"
+  },
+  "summary": {
+    "passed": 13,
+    "failed": 2,
+    "skipped": 0,
+    "total": 15
+  },
+  "results": [
+    {
+      "scenario": "Market Creation",
+      "test": "Create market with 3 agents",
+      "status": "PASS",
+      "details": "Market ID: 1",
+      "txHash": "0xc26c6017b3def493dbb6d478e508cc2df588a0fbef3a5a68fcd10683a41d51a5",
+      "gasUsed": "909030"
+    },
+    {
+      "scenario": "Market Creation",
+      "test": "Token distribution (30% quorum, 60% curve, 10% treasury)",
+      "status": "PASS",
+      "details": "Deployer: 400000.0, Factory: 600000.0"
+    },
+    {
+      "scenario": "Market Creation",
+      "test": "Reject quorum < 3 agents",
+      "status": "PASS",
+      "details": "Correctly reverted"
+    },
+    {
+      "scenario": "Market Creation",
+      "test": "Reject weights not summing to 100",
+      "status": "PASS",
+      "details": "Correctly reverted"
+    },
+    {
+      "scenario": "Buy Operations",
+      "test": "Purchase with 5% slippage tolerance",
+      "status": "PASS",
+      "details": "Bought ~99.504938362 tokens for 0.01 ETH",
+      "txHash": "0x519ce8803e189ab41af5d2be6eb4b5534df17d85dbf71b1df961b8421f397475",
+      "gasUsed": "121669"
+    },
+    {
+      "scenario": "Buy Operations",
+      "test": "Reject purchase below minimum (0.001 ETH)",
+      "status": "PASS",
+      "details": "Correctly reverted"
+    },
+    {
+      "scenario": "Buy Operations",
+      "test": "Reject when slippage exceeded",
+      "status": "PASS",
+      "details": "Correctly reverted"
+    },
+    {
+      "scenario": "Buy Operations",
+      "test": "Price increases after purchase (bonding curve)",
+      "status": "PASS",
+      "details": "Before: 0.000100990098524558, After: 0.000102941731090942"
+    },
+    {
+      "scenario": "Sell Operations",
+      "test": "Sell with slippage",
+      "status": "FAIL",
+      "details": "execution reverted: Not enough tokens sold"
+    },
+    {
+      "scenario": "Sell Operations",
+      "test": "Reject sell when slippage exceeded",
+      "status": "FAIL",
+      "details": "execution reverted: Not enough tokens sold"
+    },
+    {
+      "scenario": "Protocol Fees",
+      "test": "Protocol fee is 0.5% (50 bps)",
+      "status": "PASS",
+      "details": "Fee: 50 bps, Treasury: 0x79071295C5B70b6a2e84D2c2c1de6e529c23bc89"
+    },
+    {
+      "scenario": "Governance",
+      "test": "Governance linked to Factory",
+      "status": "PASS",
+      "details": "Factory in Governance: 0x2aA29fe97aeB0a079B241fd80BFAf64dc2273dF1"
+    },
+    {
+      "scenario": "Governance",
+      "test": "Voting period is 3 days",
+      "status": "PASS",
+      "details": "Period: 259200s (3 days)"
+    },
+    {
+      "scenario": "Edge Cases",
+      "test": "Reject buy from non-existent market",
+      "status": "PASS",
+      "details": "Correctly reverted"
+    },
+    {
+      "scenario": "Edge Cases",
+      "test": "Reject sell exceeding curve liquidity",
+      "status": "PASS",
+      "details": "Correctly reverted"
+    }
+  ]
+}

@@ -11,7 +11,7 @@ describe("QuorumGovernance", function () {
 
     // Deploy factory first
     const Factory = await ethers.getContractFactory("BondingCurveFactory");
-    const factory = await Factory.deploy(treasury.address);
+    const factory = await Factory.deploy(treasury.address, ethers.ZeroAddress);
 
     // Deploy governance with factory address
     const Governance = await ethers.getContractFactory("QuorumGovernance");
@@ -268,7 +268,7 @@ describe("QuorumGovernance", function () {
 
     // Deploy factory first
     const Factory = await ethers.getContractFactory("BondingCurveFactory");
-    const factory = await Factory.deploy(treasury.address);
+    const factory = await Factory.deploy(treasury.address, ethers.ZeroAddress);
 
     // Deploy governance with factory address
     const Governance = await ethers.getContractFactory("QuorumGovernance");

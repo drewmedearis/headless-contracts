@@ -11,7 +11,7 @@ describe("BondingCurveFactory", function () {
       await ethers.getSigners();
 
     const Factory = await ethers.getContractFactory("BondingCurveFactory");
-    const factory = await Factory.deploy(treasury.address);
+    const factory = await Factory.deploy(treasury.address, ethers.ZeroAddress);
 
     return { factory, owner, treasury, agent1, agent2, agent3, agent4, buyer1, buyer2 };
   }
@@ -179,7 +179,7 @@ describe("BondingCurveFactory", function () {
       const initialPrice = await factory.getCurrentPrice(marketId);
 
       await expect(
-        factory.connect(buyer1).buy(marketId, { value: buyAmount })
+        factory.connect(buyer1).buy(marketId, 0, { value: buyAmount })
       ).to.emit(factory, "TokensPurchased");
 
       // Buyer should have received tokens
@@ -196,7 +196,7 @@ describe("BondingCurveFactory", function () {
       const buyAmount = ethers.parseEther("1");
       const treasuryBalanceBefore = await ethers.provider.getBalance(treasury.address);
 
-      await factory.connect(buyer1).buy(marketId, { value: buyAmount });
+      await factory.connect(buyer1).buy(marketId, 0, { value: buyAmount });
 
       const treasuryBalanceAfter = await ethers.provider.getBalance(treasury.address);
       const feeExpected = (buyAmount * 50n) / 10000n; // 0.5%
@@ -209,16 +209,26 @@ describe("BondingCurveFactory", function () {
 
       // Market 999 doesn't exist
       await expect(
-        factory.connect(buyer1).buy(999, { value: ethers.parseEther("0.1") })
+        factory.connect(buyer1).buy(999, 0, { value: ethers.parseEther("0.1") })
       ).to.be.revertedWith("Market not active");
     });
 
-    it("Should reject buying with zero ETH", async function () {
+    it("Should reject buying below minimum purchase", async function () {
       const { factory, marketId, buyer1 } = await loadFixture(deployWithMarketFixture);
 
       await expect(
-        factory.connect(buyer1).buy(marketId, { value: 0 })
-      ).to.be.revertedWith("Must send ETH");
+        factory.connect(buyer1).buy(marketId, 0, { value: 0 })
+      ).to.be.revertedWith("Below minimum purchase");
+    });
+
+    it("Should reject when slippage exceeded on buy", async function () {
+      const { factory, marketId, buyer1 } = await loadFixture(deployWithMarketFixture);
+
+      // Request unreasonably high minTokensOut
+      const unreasonableMinTokens = ethers.parseEther("999999999");
+      await expect(
+        factory.connect(buyer1).buy(marketId, unreasonableMinTokens, { value: ethers.parseEther("0.01") })
+      ).to.be.revertedWith("Slippage exceeded");
     });
   });
 
@@ -228,7 +238,7 @@ describe("BondingCurveFactory", function () {
         await loadFixture(deployWithMarketFixture);
 
       // First buy some tokens
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.5") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.5") });
 
       const tokensOwned = await token.balanceOf(buyer1.address);
       const sellAmount = tokensOwned / 2n;
@@ -238,7 +248,7 @@ describe("BondingCurveFactory", function () {
 
       const ethBalanceBefore = await ethers.provider.getBalance(buyer1.address);
 
-      await expect(factory.connect(buyer1).sell(marketId, sellAmount)).to.emit(
+      await expect(factory.connect(buyer1).sell(marketId, sellAmount, 0)).to.emit(
         factory,
         "TokensSold"
       );
@@ -252,7 +262,7 @@ describe("BondingCurveFactory", function () {
       const { factory, marketId, buyer1 } = await loadFixture(deployWithMarketFixture);
 
       await expect(
-        factory.connect(buyer1).sell(marketId, 0)
+        factory.connect(buyer1).sell(marketId, 0, 0)
       ).to.be.revertedWith("Zero tokens");
     });
   });
@@ -264,11 +274,11 @@ describe("BondingCurveFactory", function () {
 
       const price1 = await factory.getCurrentPrice(marketId);
 
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.5") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.5") });
 
       const price2 = await factory.getCurrentPrice(marketId);
 
-      await factory.connect(buyer2).buy(marketId, { value: ethers.parseEther("0.5") });
+      await factory.connect(buyer2).buy(marketId, 0, { value: ethers.parseEther("0.5") });
 
       const price3 = await factory.getCurrentPrice(marketId);
 
@@ -292,7 +302,7 @@ describe("BondingCurveFactory", function () {
 
       // Buy enough to reach target (10 ETH default)
       await expect(
-        factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("10.5") })
+        factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("10.5") })
       ).to.emit(factory, "MarketGraduated");
 
       const market = await factory.getMarket(marketId);
@@ -304,11 +314,11 @@ describe("BondingCurveFactory", function () {
         await loadFixture(deployWithMarketFixture);
 
       // Graduate the market
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("10.5") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("10.5") });
 
       // Try to buy more
       await expect(
-        factory.connect(buyer2).buy(marketId, { value: ethers.parseEther("0.1") })
+        factory.connect(buyer2).buy(marketId, 0, { value: ethers.parseEther("0.1") })
       ).to.be.revertedWith("Market graduated");
     });
   });
@@ -371,17 +381,43 @@ describe("BondingCurveFactory", function () {
     });
   });
 
-  describe("Pause/Unpause", function () {
-    it("Should allow owner to pause a market", async function () {
+  describe("Pause/Unpause (with Timelock)", function () {
+    it("Should request pause and execute after timelock", async function () {
       const { factory, owner, marketId, buyer1 } =
         await loadFixture(deployWithMarketFixture);
 
-      // Pause the market
-      await factory.connect(owner).pause(marketId);
+      // Request pause
+      await expect(factory.connect(owner).requestPause(marketId))
+        .to.emit(factory, "PauseRequested");
 
-      // Verify market is paused by trying to buy
+      // Should still be active before timelock
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.01") });
+
+      // Advance time past PAUSE_DELAY (24 hours)
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60 + 1]);
+      await ethers.provider.send("evm_mine", []);
+
+      // Now execute pause
+      await expect(factory.connect(owner).executePause(marketId))
+        .to.emit(factory, "MarketPaused");
+
+      // Verify market is paused
       await expect(
-        factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.1") })
+        factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.1") })
+      ).to.be.revertedWith("Market not active");
+    });
+
+    it("Should allow emergency pause without timelock", async function () {
+      const { factory, owner, marketId, buyer1 } =
+        await loadFixture(deployWithMarketFixture);
+
+      // Emergency pause (immediate)
+      await expect(factory.connect(owner).emergencyPause(marketId))
+        .to.emit(factory, "MarketPaused");
+
+      // Verify market is paused immediately
+      await expect(
+        factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.1") })
       ).to.be.revertedWith("Market not active");
     });
 
@@ -389,28 +425,48 @@ describe("BondingCurveFactory", function () {
       const { factory, owner, marketId, buyer1 } =
         await loadFixture(deployWithMarketFixture);
 
-      // Pause and then unpause
-      await factory.connect(owner).pause(marketId);
+      // Emergency pause and then unpause
+      await factory.connect(owner).emergencyPause(marketId);
       await factory.connect(owner).unpause(marketId);
 
       // Should be able to buy now
       await expect(
-        factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.1") })
+        factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.1") })
       ).to.emit(factory, "TokensPurchased");
     });
 
-    it("Should reject pause from non-owner", async function () {
+    it("Should allow cancelling a pause request", async function () {
+      const { factory, owner, marketId, buyer1 } =
+        await loadFixture(deployWithMarketFixture);
+
+      // Request pause
+      await factory.connect(owner).requestPause(marketId);
+
+      // Cancel pause
+      await expect(factory.connect(owner).cancelPause(marketId))
+        .to.emit(factory, "PauseCancelled");
+
+      // Advance time past PAUSE_DELAY
+      await ethers.provider.send("evm_increaseTime", [24 * 60 * 60 + 1]);
+      await ethers.provider.send("evm_mine", []);
+
+      // Execute should fail (no pending pause)
+      await expect(factory.connect(owner).executePause(marketId))
+        .to.be.revertedWith("No pending pause");
+    });
+
+    it("Should reject requestPause from non-owner", async function () {
       const { factory, marketId, buyer1 } = await loadFixture(deployWithMarketFixture);
 
       await expect(
-        factory.connect(buyer1).pause(marketId)
+        factory.connect(buyer1).requestPause(marketId)
       ).to.be.revertedWithCustomError(factory, "OwnableUnauthorizedAccount");
     });
 
     it("Should reject unpause from non-owner", async function () {
       const { factory, owner, marketId, buyer1 } = await loadFixture(deployWithMarketFixture);
 
-      await factory.connect(owner).pause(marketId);
+      await factory.connect(owner).emergencyPause(marketId);
 
       await expect(
         factory.connect(buyer1).unpause(marketId)
@@ -422,17 +478,27 @@ describe("BondingCurveFactory", function () {
         await loadFixture(deployWithMarketFixture);
 
       // First buy some tokens
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.5") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.5") });
       const tokensOwned = await token.balanceOf(buyer1.address);
 
-      // Pause the market
-      await factory.connect(owner).pause(marketId);
+      // Emergency pause the market
+      await factory.connect(owner).emergencyPause(marketId);
 
       // Approve and try to sell
       await token.connect(buyer1).approve(factory.target, tokensOwned);
       await expect(
-        factory.connect(buyer1).sell(marketId, tokensOwned)
+        factory.connect(buyer1).sell(marketId, tokensOwned, 0)
       ).to.be.revertedWith("Market not active");
+    });
+
+    it("Should reject executePause before timelock expires", async function () {
+      const { factory, owner, marketId } = await loadFixture(deployWithMarketFixture);
+
+      await factory.connect(owner).requestPause(marketId);
+
+      // Try to execute immediately (should fail)
+      await expect(factory.connect(owner).executePause(marketId))
+        .to.be.revertedWith("Timelock not expired");
     });
   });
 
@@ -442,7 +508,7 @@ describe("BondingCurveFactory", function () {
         await loadFixture(deployWithMarketFixture);
 
       // First buy some tokens
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.5") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.5") });
       const tokensOwned = await token.balanceOf(buyer1.address);
 
       // Calculate sale return
@@ -467,7 +533,7 @@ describe("BondingCurveFactory", function () {
         await loadFixture(deployWithMarketFixture);
 
       // Buy enough to graduate (10 ETH target)
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("10.5") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("10.5") });
 
       // Get some tokens
       const tokensOwned = await token.balanceOf(buyer1.address);
@@ -475,7 +541,7 @@ describe("BondingCurveFactory", function () {
       // Approve and try to sell
       await token.connect(buyer1).approve(factory.target, tokensOwned);
       await expect(
-        factory.connect(buyer1).sell(marketId, tokensOwned / 2n)
+        factory.connect(buyer1).sell(marketId, tokensOwned / 2n, 0)
       ).to.be.revertedWith("Market graduated");
     });
 
@@ -483,11 +549,11 @@ describe("BondingCurveFactory", function () {
       const { factory, owner, marketId, buyer1 } =
         await loadFixture(deployWithMarketFixture);
 
-      // Pause market
-      await factory.connect(owner).pause(marketId);
+      // Pause market using emergency pause
+      await factory.connect(owner).emergencyPause(marketId);
 
       await expect(
-        factory.connect(buyer1).sell(marketId, ethers.parseEther("1"))
+        factory.connect(buyer1).sell(marketId, ethers.parseEther("1"), 0)
       ).to.be.revertedWith("Market not active");
     });
 
@@ -496,7 +562,7 @@ describe("BondingCurveFactory", function () {
         await loadFixture(deployWithMarketFixture);
 
       // Buy tokens
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("1") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("1") });
       const tokensOwned = await token.balanceOf(buyer1.address);
       const sellAmount = tokensOwned / 2n;
 
@@ -504,7 +570,7 @@ describe("BondingCurveFactory", function () {
       await token.connect(buyer1).approve(factory.target, sellAmount);
 
       const treasuryBalanceBefore = await ethers.provider.getBalance(treasury.address);
-      await factory.connect(buyer1).sell(marketId, sellAmount);
+      await factory.connect(buyer1).sell(marketId, sellAmount, 0);
       const treasuryBalanceAfter = await ethers.provider.getBalance(treasury.address);
 
       // Treasury should have received fee
@@ -545,18 +611,21 @@ describe("BondingCurveFactory", function () {
       ).to.be.revertedWithCustomError(factory, "OwnableUnauthorizedAccount");
     });
 
-    it("Should allow force graduation", async function () {
-      const { factory, marketId, buyer1 } = await loadFixture(deployWithMarketFixture);
+    it("Should allow force graduation by governance", async function () {
+      const { factory, owner, marketId, buyer1, agent1 } = await loadFixture(deployWithMarketFixture);
+
+      // Set governance address
+      await factory.connect(owner).setGovernance(agent1.address);
 
       // Buy some tokens but not enough to graduate
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("1.0") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("1.0") });
 
       // Market should not be graduated yet
       let market = await factory.getMarket(marketId);
       expect(market.graduated).to.be.false;
 
-      // Force graduate
-      await expect(factory.forceGraduate(marketId))
+      // Force graduate from governance
+      await expect(factory.connect(agent1).forceGraduate(marketId))
         .to.emit(factory, "MarketGraduated");
 
       // Market should now be graduated
@@ -564,36 +633,98 @@ describe("BondingCurveFactory", function () {
       expect(market.graduated).to.be.true;
     });
 
+    it("Should reject force graduation from non-governance", async function () {
+      const { factory, owner, marketId, buyer1 } = await loadFixture(deployWithMarketFixture);
+
+      // Set governance to owner
+      await factory.connect(owner).setGovernance(owner.address);
+
+      // Try to force graduate from buyer1 (not governance)
+      await expect(factory.connect(buyer1).forceGraduate(marketId))
+        .to.be.revertedWith("Only governance");
+    });
+
     it("Should reject force graduation of inactive market", async function () {
       const { factory, owner, marketId } = await loadFixture(deployWithMarketFixture);
 
-      // Pause market
-      await factory.connect(owner).pause(marketId);
+      // Set governance address
+      await factory.connect(owner).setGovernance(owner.address);
+
+      // Pause market using emergency pause
+      await factory.connect(owner).emergencyPause(marketId);
 
       // Force graduate should fail
-      await expect(factory.forceGraduate(marketId)).to.be.revertedWith("Market not active");
+      await expect(factory.connect(owner).forceGraduate(marketId)).to.be.revertedWith("Market not active");
     });
 
     it("Should reject force graduation of already graduated market", async function () {
-      const { factory, marketId, buyer1 } = await loadFixture(deployWithMarketFixture);
+      const { factory, owner, marketId, buyer1 } = await loadFixture(deployWithMarketFixture);
+
+      // Set governance address
+      await factory.connect(owner).setGovernance(owner.address);
 
       // Graduate normally
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("10.5") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("10.5") });
 
       // Force graduate should fail
-      await expect(factory.forceGraduate(marketId)).to.be.revertedWith("Already graduated");
+      await expect(factory.connect(owner).forceGraduate(marketId)).to.be.revertedWith("Already graduated");
     });
 
     it("Should emit events on pause/unpause", async function () {
       const { factory, owner, marketId } = await loadFixture(deployWithMarketFixture);
 
-      await expect(factory.connect(owner).pause(marketId))
+      await expect(factory.connect(owner).emergencyPause(marketId))
         .to.emit(factory, "MarketPaused")
         .withArgs(marketId);
 
       await expect(factory.connect(owner).unpause(marketId))
         .to.emit(factory, "MarketUnpaused")
         .withArgs(marketId);
+    });
+  });
+
+  describe("Uniswap Router Configuration", function () {
+    it("Should allow owner to set Uniswap router", async function () {
+      const { factory, owner, agent1 } = await loadFixture(deployFactoryFixture);
+
+      // Use a mock address for the router
+      const mockRouter = agent1.address;
+
+      await expect(factory.connect(owner).setUniswapRouter(mockRouter))
+        .to.emit(factory, "UniswapRouterUpdated")
+        .withArgs(mockRouter);
+
+      expect(await factory.uniswapRouter()).to.equal(mockRouter);
+    });
+
+    it("Should reject setUniswapRouter from non-owner", async function () {
+      const { factory, buyer1, agent1 } = await loadFixture(deployFactoryFixture);
+
+      await expect(
+        factory.connect(buyer1).setUniswapRouter(agent1.address)
+      ).to.be.revertedWithCustomError(factory, "OwnableUnauthorizedAccount");
+    });
+
+    it("Should reject setUniswapRouter with zero address", async function () {
+      const { factory, owner } = await loadFixture(deployFactoryFixture);
+
+      await expect(
+        factory.connect(owner).setUniswapRouter(ethers.ZeroAddress)
+      ).to.be.revertedWith("Zero address");
+    });
+
+    it("Should graduate without Uniswap when router not set", async function () {
+      const { factory, marketId, buyer1 } = await loadFixture(deployWithMarketFixture);
+
+      // Verify router is not set
+      expect(await factory.uniswapRouter()).to.equal(ethers.ZeroAddress);
+
+      // Graduate by buying enough tokens
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("10.5") });
+
+      const market = await factory.getMarket(marketId);
+      expect(market.graduated).to.be.true;
+      expect(market.lpPair).to.equal(ethers.ZeroAddress); // No LP pair created
     });
   });
 
@@ -615,7 +746,7 @@ describe("BondingCurveFactory", function () {
       const treasuryBalanceBefore = await ethers.provider.getBalance(treasury.address);
 
       // Buy tokens - should work without fee transfer
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.1") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.1") });
 
       // Treasury should not receive any ETH (no fee)
       const treasuryBalanceAfter = await ethers.provider.getBalance(treasury.address);
@@ -635,7 +766,7 @@ describe("BondingCurveFactory", function () {
       const marketToken = await ethers.getContractAt("MarketToken", marketData.tokenAddress);
 
       // Buy some tokens
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.5") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.5") });
 
       // Set protocol fee to 0 before selling
       await factory.connect(owner).setProtocolFeeBps(0);
@@ -647,7 +778,7 @@ describe("BondingCurveFactory", function () {
       await marketToken.connect(buyer1).approve(factory.target, sellAmount);
 
       const treasuryBalanceBefore = await ethers.provider.getBalance(treasury.address);
-      await factory.connect(buyer1).sell(marketId, sellAmount);
+      await factory.connect(buyer1).sell(marketId, sellAmount, 0);
       const treasuryBalanceAfter = await ethers.provider.getBalance(treasury.address);
 
       // Treasury should not receive any additional ETH (no fee)
@@ -702,7 +833,7 @@ describe("BondingCurveFactory", function () {
       expect(marketBefore.currentRaised).to.equal(0);
 
       // First purchase
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.2") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.2") });
 
       const marketAfter1 = await factory.getMarket(marketId);
       expect(marketAfter1.tokensSold).to.be.gt(0);
@@ -712,7 +843,7 @@ describe("BondingCurveFactory", function () {
       const currentRaisedAfter1 = marketAfter1.currentRaised;
 
       // Second purchase
-      await factory.connect(buyer2).buy(marketId, { value: ethers.parseEther("0.3") });
+      await factory.connect(buyer2).buy(marketId, 0, { value: ethers.parseEther("0.3") });
 
       const marketAfter2 = await factory.getMarket(marketId);
       expect(marketAfter2.tokensSold).to.be.gt(tokensSoldAfter1);
@@ -756,7 +887,7 @@ describe("BondingCurveFactory", function () {
         await loadFixture(deployWithMarketFixture);
 
       // Buy a small amount of tokens
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.1") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.1") });
 
       const tokensOwned = await token.balanceOf(buyer1.address);
 
@@ -764,7 +895,7 @@ describe("BondingCurveFactory", function () {
       await token.connect(buyer1).approve(factory.target, tokensOwned);
 
       // Now buy more tokens with buyer2 so there's liquidity
-      await factory.connect(buyer2).buy(marketId, { value: ethers.parseEther("0.2") });
+      await factory.connect(buyer2).buy(marketId, 0, { value: ethers.parseEther("0.2") });
 
       // Transfer some extra tokens to buyer1 from an agent (who got tokens at creation)
       const { agent1 } = await loadFixture(deployWithMarketFixture);
@@ -773,7 +904,7 @@ describe("BondingCurveFactory", function () {
       // the case where someone tries to sell more tokens than have been sold from the curve
     });
 
-    it("Should handle purchase returning zero tokens for tiny amounts", async function () {
+    it("Should reject purchase below minimum amount", async function () {
       const { factory, owner, agent1, agent2, agent3, buyer1 } =
         await loadFixture(deployFactoryFixture);
 
@@ -790,11 +921,57 @@ describe("BondingCurveFactory", function () {
 
       const marketId = 0;
 
-      // Try to buy with a tiny amount that would result in 0 tokens
-      // With 1 ETH base price and 0.5% fee, sending 1 wei should result in 0 tokens
+      // Try to buy with amount below MIN_PURCHASE (0.001 ETH)
       await expect(
-        factory.connect(buyer1).buy(marketId, { value: 1 }) // Just 1 wei
-      ).to.be.revertedWith("Zero tokens");
+        factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.0001") })
+      ).to.be.revertedWith("Below minimum purchase");
+    });
+
+    it("Should reject sell when slippage exceeded", async function () {
+      const { factory, token, marketId, buyer1 } =
+        await loadFixture(deployWithMarketFixture);
+
+      // Buy some tokens
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.5") });
+      const tokensOwned = await token.balanceOf(buyer1.address);
+
+      // Approve tokens
+      await token.connect(buyer1).approve(factory.target, tokensOwned);
+
+      // Try to sell with unreasonably high minEthOut
+      const unreasonableMinEth = ethers.parseEther("999999999");
+      await expect(
+        factory.connect(buyer1).sell(marketId, tokensOwned / 2n, unreasonableMinEth)
+      ).to.be.revertedWith("Slippage exceeded");
+    });
+
+    it("Should reject setProtocolTreasury with zero address", async function () {
+      const { factory, owner } = await loadFixture(deployFactoryFixture);
+
+      await expect(
+        factory.connect(owner).setProtocolTreasury(ethers.ZeroAddress)
+      ).to.be.revertedWith("Zero address");
+    });
+
+    it("Should reject setGovernance with zero address", async function () {
+      const { factory, owner } = await loadFixture(deployFactoryFixture);
+
+      await expect(
+        factory.connect(owner).setGovernance(ethers.ZeroAddress)
+      ).to.be.revertedWith("Zero address");
+    });
+
+    it("Should emit DefaultParametersUpdated event", async function () {
+      const { factory, owner } = await loadFixture(deployFactoryFixture);
+
+      const newBasePrice = ethers.parseEther("0.0002");
+      const newSlope = ethers.parseEther("0.00000002");
+      const newTargetRaise = ethers.parseEther("20");
+
+      await expect(
+        factory.connect(owner).setDefaultParameters(newBasePrice, newSlope, newTargetRaise)
+      ).to.emit(factory, "DefaultParametersUpdated")
+        .withArgs(newBasePrice, newSlope, newTargetRaise);
     });
 
     it("Should handle very large purchases approaching graduation", async function () {
@@ -802,7 +979,7 @@ describe("BondingCurveFactory", function () {
         await loadFixture(deployWithMarketFixture);
 
       // Buy almost enough to graduate
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("9.9") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("9.9") });
 
       const market = await factory.getMarket(marketId);
       expect(market.graduated).to.be.false;
@@ -814,15 +991,15 @@ describe("BondingCurveFactory", function () {
         await loadFixture(deployWithMarketFixture);
 
       // Buy some tokens
-      await factory.connect(buyer1).buy(marketId, { value: ethers.parseEther("0.5") });
+      await factory.connect(buyer1).buy(marketId, 0, { value: ethers.parseEther("0.5") });
       const tokens1 = await token.balanceOf(buyer1.address);
 
       // Approve and sell half
       await token.connect(buyer1).approve(factory.target, tokens1 / 2n);
-      await factory.connect(buyer1).sell(marketId, tokens1 / 2n);
+      await factory.connect(buyer1).sell(marketId, tokens1 / 2n, 0);
 
       // Buy more with buyer2
-      await factory.connect(buyer2).buy(marketId, { value: ethers.parseEther("0.3") });
+      await factory.connect(buyer2).buy(marketId, 0, { value: ethers.parseEther("0.3") });
 
       // Market should still be active and tracking correctly
       const market = await factory.getMarket(marketId);

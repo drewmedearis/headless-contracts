@@ -1,0 +1,109 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "timestamp": "2026-02-03T22:06:31.972Z",
+  "contracts": {
+    "factory": "0x2aA29fe97aeB0a079B241fd80BFAf64dc2273dF1",
+    "governance": "0x0EC0833743e04Ca57C0dA0EA4eCb625fb7abb92B"
+  },
+  "summary": {
+    "passed": 8,
+    "failed": 7,
+    "skipped": 0,
+    "total": 15
+  },
+  "results": [
+    {
+      "scenario": "Market Creation",
+      "test": "Create market with 3 agents",
+      "status": "PASS",
+      "details": "Market ID: -1",
+      "txHash": "0x34baaeaaa51bb43df53894ee7fbea70b4856507d37e0eae114aa76cab0297512",
+      "gasUsed": "926130"
+    },
+    {
+      "scenario": "Market Creation",
+      "test": "Token distribution",
+      "status": "FAIL",
+      "details": "value out-of-bounds (argument=\"marketId\", value=-1, code=INVALID_ARGUMENT, version=6.16.0)"
+    },
+    {
+      "scenario": "Market Creation",
+      "test": "Reject quorum < 3 agents",
+      "status": "PASS",
+      "details": "Correctly reverted"
+    },
+    {
+      "scenario": "Market Creation",
+      "test": "Reject weights not summing to 100",
+      "status": "PASS",
+      "details": "Correctly reverted"
+    },
+    {
+      "scenario": "Buy Operations",
+      "test": "Purchase with slippage",
+      "status": "FAIL",
+      "details": "value out-of-bounds (argument=\"marketId\", value=-1, code=INVALID_ARGUMENT, version=6.16.0)"
+    },
+    {
+      "scenario": "Buy Operations",
+      "test": "Reject purchase below minimum (0.001 ETH)",
+      "status": "FAIL",
+      "details": "value out-of-bounds (argument=\"marketId\", value=-1, code=INVALID_ARGUMENT, version=6.16.0)"
+    },
+    {
+      "scenario": "Buy Operations",
+      "test": "Reject when slippage exceeded",
+      "status": "FAIL",
+      "details": "value out-of-bounds (argument=\"marketId\", value=-1, code=INVALID_ARGUMENT, version=6.16.0)"
+    },
+    {
+      "scenario": "Buy Operations",
+      "test": "Price increases after purchase",
+      "status": "FAIL",
+      "details": "value out-of-bounds (argument=\"marketId\", value=-1, code=INVALID_ARGUMENT, version=6.16.0)"
+    },
+    {
+      "scenario": "Sell Operations",
+      "test": "Sell with slippage",
+      "status": "FAIL",
+      "details": "value out-of-bounds (argument=\"marketId\", value=-1, code=INVALID_ARGUMENT, version=6.16.0)"
+    },
+    {
+      "scenario": "Sell Operations",
+      "test": "Reject sell when slippage exceeded",
+      "status": "FAIL",
+      "details": "value out-of-bounds (argument=\"marketId\", value=-1, code=INVALID_ARGUMENT, version=6.16.0)"
+    },
+    {
+      "scenario": "Protocol Fees",
+      "test": "Protocol fee is 0.5% (50 bps)",
+      "status": "PASS",
+      "details": "Fee: 50 bps, Treasury: 0x79071295C5B70b6a2e84D2c2c1de6e529c23bc89"
+    },
+    {
+      "scenario": "Governance",
+      "test": "Governance linked to Factory",
+      "status": "PASS",
+      "details": "Factory in Governance: 0x2aA29fe97aeB0a079B241fd80BFAf64dc2273dF1"
+    },
+    {
+      "scenario": "Governance",
+      "test": "Voting period is 3 days",
+      "status": "PASS",
+      "details": "Period: 259200s (3 days)"
+    },
+    {
+      "scenario": "Edge Cases",
+      "test": "Reject buy from non-existent market",
+      "status": "PASS",
+      "details": "Correctly reverted"
+    },
+    {
+      "scenario": "Edge Cases",
+      "test": "Reject sell exceeding curve liquidity",
+      "status": "PASS",
+      "details": "Correctly reverted"
+    }
+  ]
+}
