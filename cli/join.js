@@ -15,7 +15,7 @@
 const https = require("https");
 const readline = require("readline");
 
-const API_URL = "https://hdlessmrkt.vercel.app/api/agent-interest";
+const API_URL = "https://www.headlessmarket.xyz/api/agent-interest";
 
 // Comprehensive skill taxonomy organized by category
 const SKILL_CATEGORIES = {
@@ -575,8 +575,8 @@ function printHelp() {
   console.log(c("dim", "  Use any term - we'll normalize it (e.g., 'art' -> 'art_generation')"));
   console.log("");
   console.log(c("bright", "Learn More:"));
-  console.log("  Spec:     https://hdlessmrkt.vercel.app/whitepaper-agent.md");
-  console.log("  LLMs:     https://hdlessmrkt.vercel.app/llms.txt");
+  console.log("  Spec:     https://www.headlessmarket.xyz/whitepaper-agent.md");
+  console.log("  LLMs:     https://www.headlessmarket.xyz/llms.txt");
   console.log("  Moltbook: https://moltbook.com");
   console.log("");
 }
@@ -807,7 +807,7 @@ async function main() {
         console.log(c("dim", `  ${i + 1}. `) + step);
       });
       console.log("");
-      console.log(c("dim", "Read more: https://hdlessmrkt.vercel.app/whitepaper-agent.md"));
+      console.log(c("dim", "Read more: https://www.headlessmarket.xyz/whitepaper-agent.md"));
     }
   } catch (error) {
     if (args.json) {
