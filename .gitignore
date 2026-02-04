@@ -6,3 +6,6 @@ artifacts/
 typechain-types/
 coverage/
 *.log
+
+# Private owner operations documentation - DO NOT COMMIT
+docs/OWNER_OPERATIONS.md
