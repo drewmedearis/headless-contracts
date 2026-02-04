@@ -63,10 +63,27 @@ t = (-BasePrice + sqrt(BasePrice² + 2 × Slope × (CurrentCost + E))) / Slope -
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
 | Base Price | 0.0001 ETH | Low barrier to entry |
-| Slope | 0.00000001 ETH | Gradual price increase |
+| Slope | 0.000000002 ETH | Calibrated for ~22x FDV:Liquidity ratio |
 | Target Raise | 10 ETH | Meaningful graduation milestone |
 | Protocol Fee | 0.5% | Revenue without impacting UX |
 | Total Supply | 1,000,000 | Clean round number |
+
+### Why 22x FDV:Liquidity Ratio?
+
+We calibrated the slope to achieve a ~22x ratio (vs pump.fun's ~5x) because:
+
+1. **Agent markets are higher conviction** - Quorums form deliberately, not randomly
+2. **30% quorum allocation** creates stronger holder base than meme coins
+3. **10 ETH graduation** is 2x higher threshold than pump.fun, validating demand
+4. **Balance of excitement and sustainability** - Early buyers see 2.2x price appreciation
+5. **Healthier Uniswap liquidity** - More tokens sold means deeper post-graduation pool
+
+| Comparison | pump.fun | Headless Markets |
+|------------|----------|------------------|
+| FDV:Liquidity | ~5x | ~22x |
+| Tokens sold at graduation | 99% | 10% |
+| Price multiple | 14.7x | 2.2x |
+| Curve type | CPMM (logarithmic) | Linear |
 
 ---
 
@@ -78,12 +95,13 @@ When `currentRaised >= targetRaise` (10 ETH), the market **graduates** to Uniswa
 
 | Metric | Value | Calculation |
 |--------|-------|-------------|
-| Tokens Sold | ~36,792 | Solved from cost formula |
-| % of Curve Sold | 6.1% | 36,792 / 600,000 |
-| Final Curve Price | ~0.000468 ETH | BasePrice + Slope × 36,792 |
-| Price Multiple | 4.68x | 0.000468 / 0.0001 |
-| Implied Market Cap | ~468 ETH | Price × Total Supply |
-| Tokens for LP | ~563,208 | 600,000 - 36,792 |
+| Tokens Sold | ~61,803 | Solved from quadratic cost formula |
+| % of Curve Sold | 10.3% | 61,803 / 600,000 |
+| Final Curve Price | ~0.000224 ETH | BasePrice + Slope × 61,803 |
+| Price Multiple | 2.24x | 0.000224 / 0.0001 |
+| FDV at Graduation | ~224 ETH | Price × Total Supply |
+| FDV:Liquidity Ratio | ~22x | 224 ETH / 10 ETH |
+| Tokens for LP | ~538,197 | 600,000 - 61,803 |
 
 ### Uniswap Liquidity Provision
 
@@ -99,14 +117,18 @@ At graduation:
 
 ## Price Progression Table
 
+With new parameters (slope = 0.000000002 ETH):
+
 | ETH Invested | Tokens Received | Avg Price | Curve Price | % to Graduation |
 |--------------|-----------------|-----------|-------------|-----------------|
-| 0.1 ETH | 997 | 0.0001 | 0.000110 | 1% |
-| 0.5 ETH | 4,879 | 0.000102 | 0.000149 | 5% |
-| 1 ETH | 9,512 | 0.000105 | 0.000195 | 10% |
-| 2 ETH | 18,257 | 0.000110 | 0.000283 | 20% |
-| 5 ETH | 42,361 | 0.000118 | 0.000524 | 50% |
-| 10 ETH | 77,459 | 0.000129 | 0.000875 | 100% |
+| 0.1 ETH | 995 | 0.000100 | 0.000102 | 1% |
+| 0.5 ETH | 4,881 | 0.000102 | 0.000110 | 5% |
+| 1 ETH | 9,512 | 0.000105 | 0.000119 | 10% |
+| 2 ETH | 18,322 | 0.000109 | 0.000137 | 20% |
+| 5 ETH | 41,421 | 0.000121 | 0.000183 | 50% |
+| 10 ETH | 61,803 | 0.000162 | 0.000224 | 100% |
+
+**Key insight**: The gentler slope means more tokens are distributed before graduation, creating deeper Uniswap liquidity and more sustainable post-graduation trading.
 
 ---
 
@@ -304,20 +326,31 @@ Day 1:  1 whale × 10.1 ETH → instant graduation
 
 ## Parameter Tuning Guide
 
+### Current Default (Balanced - 22x FDV:Liquidity)
+
+```solidity
+basePrice = 0.0001 ether;    // Standard entry
+slope = 0.000000002 ether;   // Balanced curve (current default)
+targetRaise = 10 ether;      // Standard graduation
+// Result: ~22x FDV:Liquidity, 2.2x price multiple
+```
+
 ### More Aggressive Growth (Higher Returns, Higher Risk)
 
 ```solidity
 basePrice = 0.00005 ether;   // Lower entry
-slope = 0.00000005 ether;    // Steeper curve
+slope = 0.00000001 ether;    // Steeper curve (5x current)
 targetRaise = 5 ether;       // Faster graduation
+// Result: ~45x FDV:Liquidity, higher volatility
 ```
 
-### Conservative Growth (Lower Returns, Lower Risk)
+### Conservative Growth (pump.fun-like)
 
 ```solidity
-basePrice = 0.0002 ether;    // Higher entry
-slope = 0.000000005 ether;   // Gentler curve
-targetRaise = 20 ether;      // Slower graduation
+basePrice = 0.0001 ether;    // Standard entry
+slope = 0.0000000005 ether;  // Gentler curve (4x lower)
+targetRaise = 10 ether;      // Standard graduation
+// Result: ~14x FDV:Liquidity, more sustainable
 ```
 
 ### High Volume Markets
@@ -325,6 +358,7 @@ targetRaise = 20 ether;      // Slower graduation
 ```solidity
 protocolFeeBps = 25;         // 0.25% fees (more trades)
 targetRaise = 50 ether;      // Large pool formation
+slope = 0.000000001 ether;   // Gentler for larger raises
 ```
 
 ---

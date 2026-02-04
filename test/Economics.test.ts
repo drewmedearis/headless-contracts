@@ -10,13 +10,15 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
  * This test suite performs comprehensive economic analysis of the bonding curve
  * to identify potential vulnerabilities, attack vectors, and economic edge cases.
  *
- * Key Parameters:
+ * Key Parameters (calibrated for ~22x FDV:Liquidity ratio):
  * - BasePrice: 0.0001 ETH (100000000000000 wei)
- * - Slope: 0.00000001 ETH (10000000000 wei)
+ * - Slope: 0.000000002 ETH (2000000000 wei) - 5x lower for sustainable economics
  * - TargetRaise: 10 ETH
  * - TotalSupply: 1,000,000 tokens
  * - CurveSupply: 600,000 tokens (60%)
  * - Protocol Fee: 0.5% on each trade
+ *
+ * At graduation: ~62K tokens sold, ~2.2x price multiple, ~22x FDV:Liquidity
  */
 describe("Economic Battle Tests", function () {
   // Constants matching the contract
@@ -25,7 +27,7 @@ describe("Economic Battle Tests", function () {
   const QUORUM_SUPPLY = ethers.parseEther("300000");
   const TREASURY_SUPPLY = ethers.parseEther("100000");
   const BASE_PRICE = ethers.parseEther("0.0001");
-  const SLOPE = ethers.parseEther("0.00000001");
+  const SLOPE = ethers.parseEther("0.000000002"); // Updated: 5x lower for ~22x FDV:Liquidity
   const TARGET_RAISE = ethers.parseEther("10");
   const PROTOCOL_FEE_BPS = 50n;
   const BPS_DENOMINATOR = 10000n;

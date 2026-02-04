@@ -65,8 +65,11 @@ contract BondingCurveFactory is Ownable, ReentrancyGuard {
     uint256 public constant PAUSE_DELAY = 24 hours;        // Timelock for pause (HM-03)
 
     // Default bonding curve parameters
+    // Slope calibrated for ~22x FDV:Liquidity ratio at graduation
+    // This balances excitement for early buyers with sustainable post-graduation trading
+    // See docs/BONDING_CURVE_ECONOMICS.md for full analysis
     uint256 public defaultBasePrice = 0.0001 ether;
-    uint256 public defaultSlope = 0.00000001 ether;
+    uint256 public defaultSlope = 0.000000002 ether;  // 5x lower than original for healthier economics
     uint256 public defaultTargetRaise = 10 ether;
 
     // Governance contract address

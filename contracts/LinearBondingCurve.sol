@@ -9,15 +9,19 @@ pragma solidity ^0.8.20;
  *
  * This creates a linear price increase as tokens are purchased from the curve.
  *
- * Example with default parameters:
+ * Default parameters (calibrated for ~22x FDV:Liquidity ratio):
  *   Base Price = 0.0001 ETH
- *   Slope = 0.00000001 ETH per token
+ *   Slope = 0.000000002 ETH per token
+ *   Target Raise = 10 ETH
  *
- *   Token #1: 0.0001 ETH
- *   Token #100,000: ~0.0011 ETH
- *   Token #600,000 (max on curve): ~0.0061 ETH
+ * At graduation (10 ETH raised):
+ *   Tokens sold: ~62,000 (10% of curve)
+ *   Final price: ~0.000224 ETH (2.2x initial)
+ *   FDV: ~224 ETH
+ *   FDV:Liquidity ratio: ~22x
  *
- * Total cost to buy all tokens from curve: ~1.86 ETH (with default params)
+ * This ratio balances early buyer advantage with sustainable post-graduation trading.
+ * See docs/BONDING_CURVE_ECONOMICS.md for full analysis.
  */
 library LinearBondingCurve {
     /**
