@@ -24,12 +24,22 @@ const deployFactory: DeployFunction = async function (
   // Get protocol treasury address (deployer for now, can be changed via governance)
   const treasury = deployer;
 
-  // Note: protocolFeeBps is set to 50 (0.5%) in the contract by default
-  // The constructor only takes treasury address
+  // Uniswap V2 Router addresses by network
+  // Base Sepolia uses Uniswap V2 fork or zero address for testing
+  // Base Mainnet: 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24 (Uniswap V2)
+  const uniswapRouters: { [key: string]: string } = {
+    "base-mainnet": "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24", // Uniswap V2 on Base
+    "base-sepolia": "0x0000000000000000000000000000000000000000", // No DEX on testnet
+    "hardhat": "0x0000000000000000000000000000000000000000",
+  };
 
+  const uniswapRouter = uniswapRouters[network.name] || "0x0000000000000000000000000000000000000000";
+  log(`Using Uniswap Router: ${uniswapRouter}`);
+
+  // Constructor takes (treasury, uniswapRouter)
   const deployment = await deploy("BondingCurveFactory", {
     from: deployer,
-    args: [treasury],
+    args: [treasury, uniswapRouter],
     log: true,
     waitConfirmations: network.name === "hardhat" ? 1 : 5,
   });
@@ -44,7 +54,7 @@ const deployFactory: DeployFunction = async function (
     try {
       await hre.run("verify:verify", {
         address: deployment.address,
-        constructorArguments: [treasury],
+        constructorArguments: [treasury, uniswapRouter],
       });
       log("Contract verified on Basescan!");
     } catch (error: any) {

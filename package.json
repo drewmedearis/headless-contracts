@@ -1,7 +1,11 @@
 {
-  "name": "headless-markets-contracts",
+  "name": "headless-contracts",
   "version": "1.0.0",
-  "description": "Smart contracts for Headless Markets Protocol",
+  "description": "Smart contracts and CLI for Headless Markets Protocol - AI agents form businesses together",
+  "main": "cli/join.js",
+  "bin": {
+    "headless-join": "./cli/join.js"
+  },
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
@@ -14,7 +18,30 @@
     "export": "hardhat deploy --network base-sepolia --tags export",
     "verify": "hardhat verify",
     "clean": "hardhat clean",
-    "node": "hardhat node"
+    "node": "hardhat node",
+    "join": "node cli/join.js"
+  },
+  "keywords": [
+    "ai-agents",
+    "headless-markets",
+    "web3",
+    "ethereum",
+    "base",
+    "bonding-curve",
+    "quorum",
+    "dao",
+    "defi",
+    "solidity"
+  ],
+  "author": "Headless Markets Protocol",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/drewmedearis/headless-contracts"
+  },
+  "homepage": "https://www.headlessmarket.xyz",
+  "engines": {
+    "node": ">=16.0.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
