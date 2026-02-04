@@ -1,0 +1,360 @@
+
+
+  BondingCurveFactory
+    Deployment
+      ✔ Should set the right owner (752ms)
+      ✔ Should set the right treasury
+      ✔ Should have correct default parameters
+      ✔ Should have correct allocation constants
+    Market Creation
+      ✔ Should create a market with valid parameters
+      ✔ Should distribute tokens correctly (65ms)
+      ✔ Should reject quorum with less than 3 agents
+      ✔ Should reject quorum with more than 10 agents
+      ✔ Should reject weights that don't sum to 100
+      ✔ Should reject mismatched agents and weights arrays
+    Buying Tokens
+      ✔ Should allow buying tokens
+      ✔ Should collect protocol fee
+      ✔ Should reject buying from inactive market
+      ✔ Should reject buying below minimum purchase
+      ✔ Should reject when slippage exceeded on buy
+    Selling Tokens
+      ✔ Should allow selling tokens
+      ✔ Should reject selling zero tokens
+    Price Calculation
+      ✔ Should increase price as tokens are sold
+      ✔ Should calculate purchase return correctly
+    Graduation
+      ✔ Should graduate when target is reached
+      ✔ Should reject buying after graduation
+    Admin Functions
+      ✔ Should allow owner to change treasury
+      ✔ Should allow owner to change fee
+      ✔ Should reject fee above 5%
+      ✔ Should reject non-owner admin calls
+      ✔ Should allow owner to set default parameters
+      ✔ Should reject setDefaultParameters from non-owner
+    Pause/Unpause (with Timelock)
+      ✔ Should request pause and execute after timelock (74ms)
+      ✔ Should allow emergency pause without timelock
+      ✔ Should allow owner to unpause a market
+      ✔ Should allow cancelling a pause request
+      ✔ Should reject requestPause from non-owner
+      ✔ Should reject unpause from non-owner
+      ✔ Should reject selling from paused market
+      ✔ Should reject executePause before timelock expires
+    Sale Calculation
+      ✔ Should calculate sale return correctly
+      ✔ Should reject sale of more tokens than sold from curve
+    Selling Edge Cases
+      ✔ Should reject selling from graduated market
+      ✔ Should reject selling from inactive market
+      ✔ Should collect protocol fee on sell
+    Receive ETH
+      ✔ Should accept direct ETH transfers
+    Governance Functions
+      ✔ Should allow owner to set governance address
+      ✔ Should reject setGovernance from non-owner
+      ✔ Should allow force graduation by governance
+      ✔ Should reject force graduation from non-governance
+      ✔ Should reject force graduation of inactive market
+      ✔ Should reject force graduation of already graduated market
+      ✔ Should emit events on pause/unpause
+    Uniswap Router Configuration
+      ✔ Should allow owner to set Uniswap router
+      ✔ Should reject setUniswapRouter from non-owner
+      ✔ Should reject setUniswapRouter with zero address
+      ✔ Should graduate without Uniswap when router not set (40ms)
+    Edge Cases and Additional Coverage
+      ✔ Should handle zero protocol fee scenario (92ms)
+      ✔ Should handle selling with zero protocol fee
+      ✔ Should reject setProtocolTreasury from non-owner
+      ✔ Should create multiple markets sequentially
+      ✔ Should correctly track tokens sold and current raised
+      ✔ Should handle markets with exactly 3 agents
+      ✔ Should handle markets with exactly 10 agents
+      ✔ Should set fee to exactly 5% (maximum allowed)
+      ✔ Should reject selling more tokens than available in liquidity
+      ✔ Should reject purchase below minimum amount
+      ✔ Should reject sell when slippage exceeded
+      ✔ Should reject setProtocolTreasury with zero address
+      ✔ Should reject setGovernance with zero address
+      ✔ Should emit DefaultParametersUpdated event
+      ✔ Should handle very large purchases approaching graduation
+      ✔ Should handle buying after multiple buy/sell cycles
+
+  LinearBondingCurve
+    Price Calculations
+      ✔ Should start at base price when no tokens sold
+      ✔ Should increase price linearly as tokens are sold
+      ✔ Should follow linear formula: Price = BasePrice + Slope * TokensSold
+    Purchase Return Calculations
+      ✔ Should return more tokens for larger ETH amounts
+      ✔ Should return fewer tokens as price increases
+    Sale Return Calculations
+      ✔ Should return ETH for sold tokens
+      ✔ Should return more ETH for tokens bought at higher prices
+    Curve Economics
+      ✔ Should never exceed curve supply tokens sold
+      ✔ Should collect correct protocol fee on purchase
+      ✔ Should track total raised accurately
+    Graduation Threshold
+      ✔ Should graduate when target raise is reached
+      ✔ Should not graduate before target
+      ✔ Should allow owner to change default target raise
+    Edge Cases
+      ✔ Should handle very small purchases
+      ✔ Should handle sequential small purchases (40ms)
+      ✔ Should maintain price continuity through buy/sell cycles
+
+  MEV Attack Simulations
+    Sandwich Attacks
+      Classic Buy Sandwich
+        ✔ MEV bot attempts classic sandwich on buy - MITIGATED by slippage (45ms)
+        ✔ MEV bot sandwich succeeds if victim uses 0 slippage (user error)
+MEV Bot PnL: 0.480569333459347726 ETH
+        ✔ MEV bot profit calculation - sandwich attack economics
+      Sell Sandwich
+        ✔ MEV bot attempts sell sandwich - MITIGATED by slippage
+      Multi-Victim Sandwich
+        ✔ MEV bot attempts to sandwich multiple victims
+    Front-Running Attacks
+      Large Order Front-Running
+        ✔ Front-running large buy order - victim protected by slippage
+      Graduation Front-Running
+        ✔ MEV bot attempts graduation front-run
+        ✔ Graduation front-running with multiple bots racing
+    Back-Running Attacks
+      ✔ Back-running a large buy - no protection needed (fair game)
+    Price Manipulation Attacks
+      Flash Loan Style Attack
+        ✔ Simulated flash loan attack - can't extract via curve after graduation
+      Pump and Dump
+        ✔ Pump and dump attempt - limited by curve mechanics
+    Multi-Block MEV Strategies
+      ✔ Slow accumulation strategy
+    Slippage Protection Effectiveness
+1% slippage: TX REVERTED (victim protected)
+2% slippage: TX REVERTED (victim protected)
+5% slippage: TX REVERTED (victim protected)
+10% slippage: TX REVERTED (victim protected)
+      ✔ Calculate optimal slippage tolerance (70ms)
+Victim amount: 0.1 ETH
+Bot PnL: 0.007211302100045841 ETH
+Gas cost: 0.000242331481861451 ETH
+---
+Victim amount: 1.0 ETH
+Bot PnL: 0.354497872118572521 ETH
+Gas cost: 0.000230676005255367 ETH
+---
+Victim amount: 5.0 ETH
+Bot PnL: 2.850882150616252292 ETH
+Gas cost: 0.0002253968464736 ETH
+---
+      ✔ Protocol fees as MEV deterrent - calculate break-even (84ms)
+    Known MEV Limitations (Documented)
+      ✔ LIMITATION: Private mempool bypass (Flashbots)
+      ✔ LIMITATION: Multi-block attacks with large capital
+      ✔ LIMITATION: Graduation timing is public
+
+  Penetration Tests (Adversarial)
+    Zero Value Attacks
+      ✔ ATTACK: Buy with 0 ETH - should fail
+      ✔ ATTACK: Sell 0 tokens - should fail
+      ✔ ATTACK: Set protocol fee to 0 - should succeed (design decision)
+      ✔ ATTACK: Emergency withdraw 0 ETH - should succeed (no-op)
+      ✔ ATTACK: Set base price to 0 - should fail
+      ✔ ATTACK: Set target raise to 0 - should fail
+    Max Value / Overflow Attacks
+      ✔ ATTACK: Buy with max uint256 ETH - limited by actual balance
+      ✔ ATTACK: Sell max uint256 tokens - should fail
+      ✔ ATTACK: Set fee to max uint256 - should fail (max 500 = 5%)
+      ✔ ATTACK: Request minTokensOut as max uint256 - slippage fails
+      ✔ ATTACK: Request minEthOut as max uint256 - slippage fails
+    Invalid Market ID Attacks
+      ✔ ATTACK: Buy from non-existent market - should fail
+      ✔ ATTACK: Sell to non-existent market - should fail
+      ✔ ATTACK: Emergency pause non-existent market - should fail
+      ✔ ATTACK: Force graduate non-existent market - should fail
+      ✔ ATTACK: Rescue non-existent market - should fail
+    Unauthorized Access Attacks
+      ✔ ATTACK: Non-owner sets treasury - should fail
+      ✔ ATTACK: Non-owner sets fee - should fail
+      ✔ ATTACK: Non-owner emergency withdraws ETH - should fail
+      ✔ ATTACK: Non-owner emergency withdraws tokens - should fail
+      ✔ ATTACK: Non-owner sets governance - should fail
+      ✔ ATTACK: Non-owner sets Uniswap router - should fail
+      ✔ ATTACK: Non-owner pauses market - should fail
+      ✔ ATTACK: Non-governance force graduates - should fail
+    State Manipulation Attacks
+      ✔ ATTACK: Double-spend via rapid buy/sell - prevented by state updates
+      ✔ ATTACK: Sell tokens never purchased from curve - should fail
+      ✔ ATTACK: Buy from paused market - should fail
+      ✔ ATTACK: Buy from graduated market - should fail
+      ✔ ATTACK: Rescue non-graduated market funds - should fail
+    Economic Exploitation Attacks
+      ✔ ATTACK: Drain contract via emergency withdraw - prevented by reserve check
+      ✔ ATTACK: Sandwich attack mitigated by slippage protection
+      ✔ ATTACK: Extract more ETH than deposited via sell - prevented
+      ✔ ATTACK: Grief by creating many markets - costs ETH
+    Governance Attacks
+      ✔ ATTACK: Non-member votes on proposal - should fail
+      ✔ ATTACK: Double vote - should fail
+      ✔ ATTACK: Execute proposal without majority - should fail
+    Edge Case Attacks
+      ✔ ATTACK: Create market with all weight to one agent - must sum to 100
+      ✔ ATTACK: Create market with empty strings - allowed (no validation)
+      ✔ ATTACK: Buy exact minimum amount - should work
+      ✔ ATTACK: Buy 1 wei below minimum - should fail
+    Treasury Security
+      ✔ VERIFY: Treasury receives fees on every buy
+      ✔ VERIFY: Treasury receives fees on every sell
+      ✔ VERIFY: Only owner can change treasury address
+      ✔ VERIFY: Zero address cannot be set as treasury
+
+  QuorumGovernance
+    Deployment
+      ✔ Should set correct factory address
+      ✔ Should have correct constants
+    Quorum Proposals
+      ✔ Should allow proposing a new quorum
+      ✔ Should reject quorum below minimum size (3)
+      ✔ Should reject quorum above maximum size (10)
+      ✔ Should reject non-proposer from proposing quorum
+    Quorum Approval
+      ✔ Should allow proposed agents to approve
+      ✔ Should reject approval from non-proposed agents
+      ✔ Should reject double approval
+      ✔ Should reject approval after deadline
+    Quorum Execution
+      ✔ Should auto-execute when all agents approve
+    View Functions
+      ✔ Should return correct quorum proposal details
+    Admin Functions
+      ✔ Should allow owner to set factory
+      ✔ Should reject non-owner from setting factory
+    Governance Proposals
+      ✔ Should allow quorum member to create a proposal
+      ✔ Should reject proposal from non-quorum member
+      ✔ Should return correct proposal details via getProposal
+    Voting
+      ✔ Should allow quorum member to vote for
+      ✔ Should allow quorum member to vote against
+      ✔ Should reject vote from non-quorum member
+      ✔ Should reject double voting
+      ✔ Should reject voting after deadline
+      ✔ Should track votes correctly
+    Proposal Execution
+      ✔ Should execute AddAgent proposal with majority
+      ✔ Should execute RemoveAgent proposal
+      ✔ Should execute TreasurySpend proposal
+      ✔ Should execute AdjustFees proposal
+      ✔ Should execute ForceGraduate proposal
+      ✔ Should fail proposal without quorum
+      ✔ Should fail proposal when majority votes against
+      ✔ Should reject execution before deadline
+      ✔ Should reject execution of already executed proposal
+    Quorum Proposal Edge Cases
+      ✔ Should reject weights mismatch
+      ✔ Should reject approval of already executed quorum
+    Additional Coverage Tests
+      ✔ Should verify voting deadline is checked before proposal status
+      ✔ Should handle multiple quorum proposals
+      ✔ Should handle partial quorum approval
+      ✔ Should create multiple governance proposals for the same market
+      ✔ Should track hasVoted mapping correctly
+      ✔ Should track isQuorumMember mapping correctly
+      ✔ Should correctly retrieve proposal data for all fields
+      ✔ Should handle minimum quorum size (3 agents)
+      ✔ Should handle maximum quorum size (10 agents)
+      ✔ Should emit QuorumApproval event for proposer
+      ✔ Should handle ProposeQuorum proposal type in execute (returns false)
+      ✔ Should return 0 voting weight for non-existent voter in agents array
+      ✔ Should verify _executeQuorumProposal internal guard for already executed
+      ✔ Should handle multiple markets with separate governance
+      ✔ Should correctly calculate total weight from factory
+      ✔ Should handle edge case where for votes equal against votes
+    Governance Event Emissions
+      ✔ Should emit TreasurySpendApproved on treasury spend execution
+      ✔ Should emit FeeAdjustmentApproved on fee adjustment execution
+      ✔ Should emit ForceGraduationApproved on force graduation execution (46ms)
+
+  Security Tests
+    Reentrancy Protection
+      ✔ Should prevent reentrancy on buy() (44ms)
+      ✔ Should prevent reentrancy on sell()
+    Slippage Protection (HM-01 Verification)
+      ✔ Should protect against sandwich attack on buy
+      ✔ Should protect against sandwich attack on sell
+    Access Control
+      ✔ Should reject unauthorized pause attempts
+      ✔ Should reject unauthorized governance changes
+      ✔ Should reject unauthorized treasury changes
+      ✔ Should reject unauthorized fee changes
+      ✔ Should reject forceGraduate from non-governance
+    Timelock Protection (HM-03 Verification)
+      ✔ Should enforce 24h delay on pause
+      ✔ Should allow cancellation of pause request
+    Governance Execution Window (HM-05 Verification)
+      ✔ Should reject execution after window expires
+    Minimum Purchase (HM-07 Verification)
+      ✔ Should reject purchases below 0.001 ETH
+      ✔ Should accept purchases at exactly 0.001 ETH
+    Zero Address Checks (HM-11 Verification)
+      ✔ Should reject zero address for treasury
+      ✔ Should reject zero address for governance
+    Integer Boundary Conditions
+      ✔ Should handle maximum fee (5%)
+      ✔ Should reject fee above maximum
+      ✔ Should handle zero fee scenario
+    Market State Transitions
+      ✔ Should not allow operations on paused market
+      ✔ Should not allow operations on graduated market
+    Quorum Governance Security
+      ✔ Should prevent non-members from voting (45ms)
+      ✔ Should prevent double voting
+      ✔ Should enforce quorum size limits
+    Token Distribution Security
+      ✔ Should correctly distribute tokens to quorum on market creation
+    Economic Invariants
+      ✔ Should maintain ETH balance >= currentRaised
+      ✔ Should never allow tokensSold to exceed curve allocation
+    NEW-01 FIX: AddAgent Weight Assignment
+      ✔ Should assign weight when adding agent via governance
+    NEW-02 FIX: RemoveAgent Weight Clearing
+      ✔ Should clear weight when removing agent via governance
+    NEW-05 FIX: Duplicate Agent Prevention
+      ✔ Should reject duplicate agents in createMarket
+      ✔ Should reject duplicate agents in proposeQuorum
+    NEW-04 FIX: Early Weight Validation in proposeQuorum
+      ✔ Should reject weights not summing to 100
+    Emergency Withdrawal Functions
+      emergencyWithdrawETH
+        ✔ Should allow owner to withdraw excess ETH
+        ✔ Should reject withdrawal of reserved ETH (currentRaised)
+        ✔ Should reject non-owner emergency withdrawal
+        ✔ Should correctly calculate withdrawable across multiple markets
+        ✔ Should emit EmergencyWithdrawal event
+      emergencyWithdrawTokens
+        ✔ Should allow owner to withdraw tokens not from active markets
+        ✔ Should reject non-owner token withdrawal
+        ✔ Should reject zero address token
+        ✔ Should emit EmergencyWithdrawal event for tokens
+      rescueGraduatedMarketFunds
+        ✔ Should rescue funds from graduated market without LP
+        ✔ Should reject rescue for non-graduated market
+        ✔ Should reject non-owner rescue
+        ✔ Should emit GraduatedMarketRescued event
+        ✔ Should handle rescue when currentRaised is already zero
+      Protocol Fee Access (CRITICAL)
+        ✔ Should send protocol fees directly to treasury during buy
+        ✔ Should send protocol fees directly to treasury during sell
+        ✔ Should accumulate fees in treasury over multiple trades
+        ✔ Should update treasury address and fees go to new treasury
+    receive() Function
+      ✔ Should accept direct ETH transfers
+
+
+  249 passing (3s)
+
