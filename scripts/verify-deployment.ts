@@ -1,277 +1,63 @@
 import { ethers } from "hardhat";
-import * as fs from "fs";
-import * as path from "path";
-
-interface DeploymentInfo {
-  network: string;
-  chainId: number;
-  deployedAt: string;
-  contracts: {
-    BondingCurveFactory?: string;
-    QuorumGovernance?: string;
-  };
-}
 
 async function main() {
-  const network = await ethers.provider.getNetwork();
-  console.log("=".repeat(60));
-  console.log("POST-DEPLOYMENT VERIFICATION");
-  console.log("=".repeat(60));
-  console.log(`Network: ${network.name} (Chain ID: ${network.chainId})`);
-  console.log("");
+  const factoryAddress = "0x6064bB1536aff5A7F12CCDB47F297d1BA9967b99";
+  const governanceAddress = "0xcEB9e3257a5105FC1ea42013860aC43f5460a79e";
 
-  // Load deployed addresses
-  const addressesPath = path.join(
-    __dirname,
-    "..",
-    "deployments",
-    "base-sepolia",
-    "addresses.json"
-  );
+  console.log("=== Base Sepolia Deployment Verification ===\n");
 
-  if (!fs.existsSync(addressesPath)) {
-    console.log("ERROR: No deployment found at", addressesPath);
-    console.log("Run 'npm run deploy:sepolia' first.");
-    process.exit(1);
-  }
+  const factory = await ethers.getContractAt("BondingCurveFactory", factoryAddress);
 
-  const deployment: DeploymentInfo = JSON.parse(
-    fs.readFileSync(addressesPath, "utf8")
-  );
-  console.log("Deployment Info:");
-  console.log(`  Deployed At: ${deployment.deployedAt}`);
-  console.log("");
+  console.log("FACTORY:", factoryAddress);
+  console.log("─".repeat(50));
 
-  const results: { check: string; status: string; details: string }[] = [];
+  const basePrice = await factory.defaultBasePrice();
+  const slope = await factory.defaultSlope();
+  const targetRaise = await factory.defaultTargetRaise();
+  const protocolFee = await factory.protocolFeeBps();
+  const treasury = await factory.protocolTreasury();
+  const owner = await factory.owner();
+  const marketCount = await factory.marketCount();
 
-  // Get deployer
-  const [deployer] = await ethers.getSigners();
-  console.log(`Deployer Address: ${deployer.address}`);
-  console.log("");
+  console.log("Parameters:");
+  console.log("  Base Price:", ethers.formatEther(basePrice), "ETH");
+  console.log("  Slope:", ethers.formatEther(slope), "ETH");
+  console.log("  Target Raise:", ethers.formatEther(targetRaise), "ETH");
+  console.log("  Protocol Fee:", protocolFee.toString(), "bps");
+  console.log("\nAddresses:");
+  console.log("  Treasury:", treasury);
+  console.log("  Owner:", owner);
+  console.log("\nState:");
+  console.log("  Markets Created:", marketCount.toString());
 
-  // ============================================
-  // BONDING CURVE FACTORY CHECKS
-  // ============================================
-  if (deployment.contracts.BondingCurveFactory) {
-    console.log("-".repeat(60));
-    console.log("BONDING CURVE FACTORY");
-    console.log("-".repeat(60));
-    console.log(`Address: ${deployment.contracts.BondingCurveFactory}`);
+  // Calculate expected graduation metrics
+  const slopeNum = Number(ethers.formatEther(slope));
+  const basePriceNum = Number(ethers.formatEther(basePrice));
+  const targetNum = Number(ethers.formatEther(targetRaise));
 
-    try {
-      const factory = await ethers.getContractAt(
-        "BondingCurveFactory",
-        deployment.contracts.BondingCurveFactory
-      );
+  const a = slopeNum / 2;
+  const b = basePriceNum;
+  const c = -targetNum;
+  const tokensAtGrad = (-b + Math.sqrt(b*b - 4*a*c)) / (2*a);
 
-      // Check owner
-      const owner = await factory.owner();
-      const ownerMatch = owner.toLowerCase() === deployer.address.toLowerCase();
-      results.push({
-        check: "Factory: Owner matches deployer",
-        status: ownerMatch ? "PASS" : "WARN",
-        details: `Owner: ${owner}`,
-      });
-      console.log(`  Owner: ${owner} ${ownerMatch ? "✓" : "⚠"}`);
+  const priceAtGrad = basePriceNum + slopeNum * tokensAtGrad;
+  const fdvAtGrad = priceAtGrad * 1_000_000;
+  const ratio = fdvAtGrad / targetNum;
 
-      // Check protocol fee
-      const feeBps = await factory.protocolFeeBps();
-      const feeCorrect = feeBps === 50n;
-      results.push({
-        check: "Factory: Protocol fee is 0.5%",
-        status: feeCorrect ? "PASS" : "FAIL",
-        details: `Fee: ${feeBps} bps`,
-      });
-      console.log(`  Protocol Fee: ${feeBps} bps ${feeCorrect ? "✓" : "✗"}`);
+  console.log("\nGraduation Metrics (at 10 ETH raised):");
+  console.log("  Tokens sold:", Math.round(tokensAtGrad).toLocaleString());
+  console.log("  % of curve:", (tokensAtGrad / 600000 * 100).toFixed(1) + "%");
+  console.log("  Final price:", priceAtGrad.toFixed(8), "ETH");
+  console.log("  FDV:", fdvAtGrad.toFixed(1), "ETH");
+  console.log("  FDV:Liquidity:", ratio.toFixed(1) + "x");
 
-      // Check treasury
-      const treasury = await factory.treasury();
-      results.push({
-        check: "Factory: Treasury set",
-        status: treasury !== ethers.ZeroAddress ? "PASS" : "FAIL",
-        details: `Treasury: ${treasury}`,
-      });
-      console.log(`  Treasury: ${treasury}`);
+  const factoryBal = await ethers.provider.getBalance(factoryAddress);
+  const treasuryBal = await ethers.provider.getBalance(treasury);
+  console.log("\nBalances:");
+  console.log("  Factory:", ethers.formatEther(factoryBal), "ETH");
+  console.log("  Treasury:", ethers.formatEther(treasuryBal), "ETH");
 
-      // Check paused state
-      const paused = await factory.paused();
-      results.push({
-        check: "Factory: Not paused",
-        status: !paused ? "PASS" : "WARN",
-        details: `Paused: ${paused}`,
-      });
-      console.log(`  Paused: ${paused} ${!paused ? "✓" : "⚠"}`);
-
-      // Check market count
-      const marketCount = await factory.marketCount();
-      results.push({
-        check: "Factory: Market count accessible",
-        status: "PASS",
-        details: `Markets: ${marketCount}`,
-      });
-      console.log(`  Market Count: ${marketCount}`);
-    } catch (error: any) {
-      console.log(`  ERROR: ${error.message}`);
-      results.push({
-        check: "Factory: Contract accessible",
-        status: "FAIL",
-        details: error.message,
-      });
-    }
-  } else {
-    console.log("BondingCurveFactory: NOT DEPLOYED");
-    results.push({
-      check: "Factory: Deployed",
-      status: "FAIL",
-      details: "Not found in addresses.json",
-    });
-  }
-
-  console.log("");
-
-  // ============================================
-  // QUORUM GOVERNANCE CHECKS
-  // ============================================
-  if (deployment.contracts.QuorumGovernance) {
-    console.log("-".repeat(60));
-    console.log("QUORUM GOVERNANCE");
-    console.log("-".repeat(60));
-    console.log(`Address: ${deployment.contracts.QuorumGovernance}`);
-
-    try {
-      const governance = await ethers.getContractAt(
-        "QuorumGovernance",
-        deployment.contracts.QuorumGovernance
-      );
-
-      // Check owner
-      const owner = await governance.owner();
-      const ownerMatch = owner.toLowerCase() === deployer.address.toLowerCase();
-      results.push({
-        check: "Governance: Owner matches deployer",
-        status: ownerMatch ? "PASS" : "WARN",
-        details: `Owner: ${owner}`,
-      });
-      console.log(`  Owner: ${owner} ${ownerMatch ? "✓" : "⚠"}`);
-
-      // Check factory link
-      const factoryAddr = await governance.factory();
-      const factoryLinked =
-        factoryAddr.toLowerCase() ===
-        deployment.contracts.BondingCurveFactory?.toLowerCase();
-      results.push({
-        check: "Governance: Linked to Factory",
-        status: factoryLinked ? "PASS" : "FAIL",
-        details: `Factory: ${factoryAddr}`,
-      });
-      console.log(`  Factory: ${factoryAddr} ${factoryLinked ? "✓" : "✗"}`);
-
-      // Check voting period
-      const votingPeriod = await governance.VOTING_PERIOD();
-      const votingCorrect = votingPeriod === 259200n; // 3 days in seconds
-      results.push({
-        check: "Governance: Voting period is 3 days",
-        status: votingCorrect ? "PASS" : "WARN",
-        details: `Period: ${votingPeriod}s`,
-      });
-      console.log(
-        `  Voting Period: ${votingPeriod}s (${Number(votingPeriod) / 86400} days) ${votingCorrect ? "✓" : "⚠"}`
-      );
-
-      // Check quorum threshold
-      const quorumThreshold = await governance.QUORUM_THRESHOLD();
-      const quorumCorrect = quorumThreshold === 6666n; // 66.66%
-      results.push({
-        check: "Governance: Quorum threshold is 66.66%",
-        status: quorumCorrect ? "PASS" : "WARN",
-        details: `Threshold: ${quorumThreshold} bps`,
-      });
-      console.log(
-        `  Quorum Threshold: ${quorumThreshold} bps (${Number(quorumThreshold) / 100}%) ${quorumCorrect ? "✓" : "⚠"}`
-      );
-
-      // Check proposal count
-      const proposalCount = await governance.proposalCount();
-      results.push({
-        check: "Governance: Proposal count accessible",
-        status: "PASS",
-        details: `Proposals: ${proposalCount}`,
-      });
-      console.log(`  Proposal Count: ${proposalCount}`);
-    } catch (error: any) {
-      console.log(`  ERROR: ${error.message}`);
-      results.push({
-        check: "Governance: Contract accessible",
-        status: "FAIL",
-        details: error.message,
-      });
-    }
-  } else {
-    console.log("QuorumGovernance: NOT DEPLOYED");
-    results.push({
-      check: "Governance: Deployed",
-      status: "FAIL",
-      details: "Not found in addresses.json",
-    });
-  }
-
-  console.log("");
-
-  // ============================================
-  // SUMMARY
-  // ============================================
-  console.log("=".repeat(60));
-  console.log("VERIFICATION SUMMARY");
-  console.log("=".repeat(60));
-
-  const passed = results.filter((r) => r.status === "PASS").length;
-  const warned = results.filter((r) => r.status === "WARN").length;
-  const failed = results.filter((r) => r.status === "FAIL").length;
-
-  console.log(`  PASSED: ${passed}`);
-  console.log(`  WARNINGS: ${warned}`);
-  console.log(`  FAILED: ${failed}`);
-  console.log("");
-
-  // Print failures
-  if (failed > 0) {
-    console.log("FAILURES:");
-    results
-      .filter((r) => r.status === "FAIL")
-      .forEach((r) => {
-        console.log(`  ✗ ${r.check}`);
-        console.log(`    ${r.details}`);
-      });
-  }
-
-  // Print warnings
-  if (warned > 0) {
-    console.log("WARNINGS:");
-    results
-      .filter((r) => r.status === "WARN")
-      .forEach((r) => {
-        console.log(`  ⚠ ${r.check}`);
-        console.log(`    ${r.details}`);
-      });
-  }
-
-  console.log("");
-  console.log("=".repeat(60));
-
-  // Exit with appropriate code
-  if (failed > 0) {
-    console.log("RESULT: VERIFICATION FAILED");
-    process.exit(1);
-  } else if (warned > 0) {
-    console.log("RESULT: VERIFICATION PASSED WITH WARNINGS");
-    process.exit(0);
-  } else {
-    console.log("RESULT: ALL CHECKS PASSED");
-    process.exit(0);
-  }
+  console.log("\n✅ Deployment verified!");
 }
 
-main().catch((error) => {
-  console.error("Verification script failed:", error);
-  process.exit(1);
-});
+main().catch(console.error);

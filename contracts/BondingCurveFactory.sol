@@ -643,16 +643,18 @@ contract BondingCurveFactory is Ownable, ReentrancyGuard {
 
     /**
      * @dev Emergency withdraw ETH stuck in contract
-     * Can only withdraw excess ETH (not reserved for active markets)
+     * Can only withdraw excess ETH (not reserved for markets)
+     * SECURITY FIX (HM-NEW-01): Protects funds regardless of pause status
      * @param amount Amount of ETH to withdraw
      */
     function emergencyWithdrawETH(uint256 amount) external onlyOwner {
         uint256 contractBalance = address(this).balance;
 
-        // Calculate total reserved ETH across all active markets
+        // Calculate total reserved ETH across ALL non-graduated markets
+        // This protects user funds even if market is paused (HM-NEW-01 fix)
         uint256 reservedETH = 0;
         for (uint256 i = 0; i < marketCount; i++) {
-            if (markets[i].active && !markets[i].graduated) {
+            if (!markets[i].graduated) {
                 reservedETH += markets[i].currentRaised;
             }
         }
@@ -668,16 +670,18 @@ contract BondingCurveFactory is Ownable, ReentrancyGuard {
 
     /**
      * @dev Emergency withdraw tokens stuck in contract
-     * Cannot withdraw tokens that belong to active market curves
+     * Cannot withdraw tokens that belong to market curves
+     * SECURITY FIX (HM-NEW-01): Protects tokens regardless of pause status
      * @param token Token address to withdraw
      * @param amount Amount to withdraw
      */
     function emergencyWithdrawTokens(address token, uint256 amount) external onlyOwner {
         require(token != address(0), "Invalid token");
 
-        // Check if this token belongs to any active market
+        // Check if this token belongs to any non-graduated market (active or paused)
+        // This protects user tokens even if market is paused (HM-NEW-01 fix)
         for (uint256 i = 0; i < marketCount; i++) {
-            if (markets[i].tokenAddress == token && markets[i].active && !markets[i].graduated) {
+            if (markets[i].tokenAddress == token && !markets[i].graduated) {
                 // Calculate reserved tokens for this market's curve
                 uint256 curveSupply = (TOTAL_SUPPLY * CURVE_ALLOCATION_BPS) / BPS_DENOMINATOR;
                 uint256 remainingCurve = curveSupply - markets[i].tokensSold;
