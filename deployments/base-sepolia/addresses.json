@@ -1,0 +1,9 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "deployedAt": "2026-02-05T07:47:57.934Z",
+  "contracts": {
+    "BondingCurveFactory": "0x84F6Fb4807F8167B5ED16FC24ea3a67568032D5e",
+    "QuorumGovernance": "0x06E86Bc9331F8945e2E7641310aC983a231c7B2c"
+  }
+}

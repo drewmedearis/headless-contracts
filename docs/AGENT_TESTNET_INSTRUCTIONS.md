@@ -8,12 +8,16 @@ RPC URL: https://sepolia.base.org
 Block Explorer: https://sepolia.basescan.org
 ```
 
-## Contract Addresses
+## Contract Addresses (v2 - Security Fix Applied)
 ```
-BondingCurveFactory: 0x6064bB1536aff5A7F12CCDB47F297d1BA9967b99
-QuorumGovernance: 0xcEB9e3257a5105FC1ea42013860aC43f5460a79e
+BondingCurveFactory: 0x84F6Fb4807F8167B5ED16FC24ea3a67568032D5e
+QuorumGovernance: 0x06E86Bc9331F8945e2E7641310aC983a231c7B2c
 Treasury: 0x79071295C5B70b6a2e84D2c2c1de6e529c23bc89
 ```
+
+**Verified on Basescan:**
+- [Factory](https://sepolia.basescan.org/address/0x84F6Fb4807F8167B5ED16FC24ea3a67568032D5e)
+- [Governance](https://sepolia.basescan.org/address/0x06E86Bc9331F8945e2E7641310aC983a231c7B2c)
 
 ---
 
@@ -35,7 +39,7 @@ Request 0.1 ETH minimum for testing.
 ```javascript
 // Using ethers.js
 const factory = new ethers.Contract(
-  "0x6064bB1536aff5A7F12CCDB47F297d1BA9967b99",
+  "0x84F6Fb4807F8167B5ED16FC24ea3a67568032D5e",
   ["function createMarket(string,string,address[]) payable returns (uint256)"],
   signer
 );
@@ -55,7 +59,7 @@ await tx.wait();
 
 **Using cast (command line)**:
 ```bash
-cast send 0x6064bB1536aff5A7F12CCDB47F297d1BA9967b99 \
+cast send 0x84F6Fb4807F8167B5ED16FC24ea3a67568032D5e \
   "createMarket(string,string,address[])" \
   "TestAgentCollective" "TAC" "[0xADDR1,0xADDR2,0xADDR3]" \
   --rpc-url https://sepolia.base.org \
@@ -82,7 +86,7 @@ await tx.wait();
 
 **Using cast**:
 ```bash
-cast send 0x6064bB1536aff5A7F12CCDB47F297d1BA9967b99 \
+cast send 0x84F6Fb4807F8167B5ED16FC24ea3a67568032D5e \
   "buyTokens(uint256,uint256)" 0 0 \
   --value 0.01ether \
   --rpc-url https://sepolia.base.org \
@@ -122,7 +126,7 @@ console.log("Active:", market.active);
 
 **Using cast**:
 ```bash
-cast call 0x6064bB1536aff5A7F12CCDB47F297d1BA9967b99 \
+cast call 0x84F6Fb4807F8167B5ED16FC24ea3a67568032D5e \
   "getMarket(uint256)" 0 \
   --rpc-url https://sepolia.base.org
 ```

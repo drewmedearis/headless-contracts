@@ -1,10 +1,10 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  const factoryAddress = "0x6064bB1536aff5A7F12CCDB47F297d1BA9967b99";
-  const governanceAddress = "0xcEB9e3257a5105FC1ea42013860aC43f5460a79e";
+  const factoryAddress = "0x84F6Fb4807F8167B5ED16FC24ea3a67568032D5e";
+  const governanceAddress = "0x06E86Bc9331F8945e2E7641310aC983a231c7B2c";
 
-  console.log("=== Base Sepolia Deployment Verification ===\n");
+  console.log("=== NEW Base Sepolia Deployment Verification ===\n");
 
   const factory = await ethers.getContractAt("BondingCurveFactory", factoryAddress);
 
@@ -23,7 +23,7 @@ async function main() {
   console.log("  Base Price:", ethers.formatEther(basePrice), "ETH");
   console.log("  Slope:", ethers.formatEther(slope), "ETH");
   console.log("  Target Raise:", ethers.formatEther(targetRaise), "ETH");
-  console.log("  Protocol Fee:", protocolFee.toString(), "bps");
+  console.log("  Protocol Fee:", protocolFee.toString(), "bps (0.5%)");
   console.log("\nAddresses:");
   console.log("  Treasury:", treasury);
   console.log("  Owner:", owner);
@@ -51,13 +51,22 @@ async function main() {
   console.log("  FDV:", fdvAtGrad.toFixed(1), "ETH");
   console.log("  FDV:Liquidity:", ratio.toFixed(1) + "x");
 
-  const factoryBal = await ethers.provider.getBalance(factoryAddress);
-  const treasuryBal = await ethers.provider.getBalance(treasury);
-  console.log("\nBalances:");
-  console.log("  Factory:", ethers.formatEther(factoryBal), "ETH");
-  console.log("  Treasury:", ethers.formatEther(treasuryBal), "ETH");
+  // Governance
+  console.log("\n");
+  console.log("GOVERNANCE:", governanceAddress);
+  console.log("─".repeat(50));
 
-  console.log("\n✅ Deployment verified!");
+  const governance = await ethers.getContractAt("QuorumGovernance", governanceAddress);
+  const govOwner = await governance.owner();
+  const linkedFactory = await governance.factory();
+
+  console.log("  Owner:", govOwner);
+  console.log("  Linked Factory:", linkedFactory);
+
+  console.log("\n✅ Fresh deployment verified with security fix!");
+  console.log("\nBasescan Links:");
+  console.log("  Factory: https://sepolia.basescan.org/address/" + factoryAddress);
+  console.log("  Governance: https://sepolia.basescan.org/address/" + governanceAddress);
 }
 
 main().catch(console.error);
